@@ -68,9 +68,9 @@ def readPdfFile(inf):
 class AppleCardProcessor:
     OUT_FILE_POSTFIX = '_ImportThis.csv'
     PMT_RE=re.compile(r"(?P<date>\d\d/\d\d/20[12]\d) {5,}(?P<description>.+?) {5,}(?P<amount>-?\$?[0-9,]+\.\d\d)")
-    TRX_RE=re.compile(r"(?P<date>\d\d/\d\d/20[12]\d) {5,}(?P<description>.+?) {5,}(?P<dailycash>\d+[%] {1,12}-?\$?[0-9,]+\.\d\d) {5,}(?P<amount>-?\$?[0-9,]+\.\d\d)")
+    TRX_RE=re.compile(r"(?P<date>\d\d/\d\d/20[12]\d) {5,}(?P<description>.+?) +(?P<dailycash>\d+[%] {1,30}-?\$?[0-9,]+\.\d\d) {5,}(?P<amount>-?\$?[0-9,]+\.\d\d)")
     DC_RE=re.compile(r"Total Daily Cash earned this month {5,}(?P<amount>-?\$?[0-9,]+\.\d\d)")
-    SD_RE=re.compile(r".*?Balance as of (?P<date>(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) +[0-3]\d, +20[1-2]\d)")
+    SD_RE=re.compile(r"as of (?P<date>(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) +[0-3]\d, +20[1-2]\d)")
     SB_RE=re.compile(r"(?P<amount>-?\$?[0-9,]+\.\d\d)")
     IC_RE=re.compile(r"Total interest for this month +(?P<amount>-?\$?[0-9,]+\.\d\d)")
 
@@ -88,6 +88,7 @@ class AppleCardProcessor:
             'Interest Charged':self.InterestChargedLine,
             'Payment Information':self.PaymentInformationLine,
         }
+        self.DEFAULTSECTION = "Payment Information"
 
     def PaymentLine(self,l):
         m = self.PMT_RE.match(l)
@@ -143,7 +144,7 @@ class AppleCardProcessor:
     def Read(self):
         t = readPdfFile(self.pdffile)
         
-        sectiontype = None
+        sectiontype = self.DEFAULTSECTION
         
         for l in t:
             l = l.strip()
