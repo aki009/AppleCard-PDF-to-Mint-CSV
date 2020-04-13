@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 __author__ = "Aki Korhonen"
-__copyright__ = "Copyright 2019 Aki Korhonen"
+__copyright__ = "Copyright 2020 Aki Korhonen"
 __credits__ = ["Aki Korhonen"]
 __license__ = "GPL"
-__version__ = "1.0.1"
+__version__ = "1.0.4"
 __maintainer__ = "Aki Korhonen"
 __email__ = ""
 __status__ = "Production"
@@ -23,6 +23,11 @@ This code assumes US date and currency formats, and USD for currency.
 
 No guarantees that this thing works for any particular purpose.
 "It seems to work on my computer"
+
+Version history:
+
+2020-04-13 1.0.4 - added correct handling for credit amounts
+
 """
 
 import os
@@ -35,6 +40,8 @@ import csv
 
 
 SCANFOLDER = '/Users/aki/Downloads'
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# You'll want to edit the above line
 
 pdfRePattern = re.compile(r"Apple Card Statement - (January|February|March|April|May|June|July|August|September|October|November|December) 20[12]\d.pdf")
 
@@ -68,7 +75,11 @@ def readPdfFile(inf):
 class AppleCardProcessor:
     OUT_FILE_POSTFIX = '_ImportThis.csv'
     PMT_RE=re.compile(r"(?P<date>\d\d/\d\d/20[12]\d) {5,}(?P<description>.+?) {5,}(?P<amount>-?\$?[0-9,]+\.\d\d)")
-    TRX_RE=re.compile(r"(?P<date>\d\d/\d\d/20[12]\d) {5,}(?P<description>.+?) +(?P<dailycash>\d+[%] {1,30}-?\$?[0-9,]+\.\d\d) {5,}(?P<amount>-?\$?[0-9,]+\.\d\d)")
+    #TRX_RE=re.compile(r"(?P<date>\d\d/\d\d/20[12]\d) {5,}(?P<description>.+?) +(?P<dailycash>\d+[%] {1,30}-?\$?[0-9,]+\.\d\d) {5,}(?P<amount>-?\$?[0-9,]+\.\d\d)")
+    TRX_RE=re.compile(r"(?P<date>\d\d/\d\d/20[12]\d) +(?P<description>.+?) +(?P<dailycash>\d+[%] {1,30}-?\$?[0-9,]+\.\d\d)? *(?P<amount>-?\$?[0-9,]+\.\d\d)")
+
+    TRX_DCA_RE=re.compile(r"Daily Cash Adjustment +(?P<dailycash>-?\d+[%] +)?(?P<amount>-?\$?[0-9,]+\.\d\d)")
+
     DC_RE=re.compile(r"Total Daily Cash earned this month {5,}(?P<amount>-?\$?[0-9,]+\.\d\d)")
     SD_RE=re.compile(r"as of (?P<date>(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) +[0-3]\d, +20[1-2]\d)")
     SB_RE=re.compile(r"(?P<amount>-?\$?[0-9,]+\.\d\d)")
@@ -89,6 +100,8 @@ class AppleCardProcessor:
             'Payment Information':self.PaymentInformationLine,
         }
         self.DEFAULTSECTION = "Payment Information"
+        self.lastTxWasCredit = False
+        self.lastTxCreditDate = None
 
     def PaymentLine(self,l):
         m = self.PMT_RE.match(l)
@@ -99,12 +112,26 @@ class AppleCardProcessor:
             self.transactions.append((d,m['description'],a))
 
     def TransactionLine(self,l):
+        if self.lastTxWasCredit:
+            m = self.TRX_DCA_RE.match(l)
+            if m:
+                m = m.groupdict()
+                d = self.lastTxCreditDate
+                a = float(m['amount'].replace("$","").replace(",",""))
+                self.transactions.append((d,"Daily Cash Adjustment",a))
+            self.lastTxWasCredit = False
+            self.lastTxCreditDate = None
+            
+                
         m = self.TRX_RE.match(l)
         if m:
             m = m.groupdict()
             d = datetime.datetime.strptime(m['date'], '%m/%d/%Y')
             a = float(m['amount'].replace("$","").replace(",",""))
             self.transactions.append((d,m['description'],a))
+            if a<0:
+                self.lastTxWasCredit = True
+                self.lastTxCreditDate = d
         else:
             m = self.DC_RE.match(l)
             if m:
