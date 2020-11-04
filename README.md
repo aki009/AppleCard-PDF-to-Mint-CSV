@@ -1,3 +1,6 @@
+# DEPRECATED
+Apple Card statements can now be exported as QFX files that can be imported into Quicken.
+
 # AppleCard-PDF-to-Mint-CSV
 Read Apple Card PDF statements and spit out CSV files for import into Quicken for Mac
 
